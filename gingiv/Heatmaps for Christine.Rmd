@@ -1,0 +1,380 @@
+---
+title: "Heatmap for Christine"
+author: "NN"
+date: "2023-12-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+set.seed(143)
+knitr::opts_chunk$set(echo = TRUE)
+install.packages(microViz)
+#install.packages("remotes")
+#remotes::install_github("kasperskytte/ampvis2", Ncpus = 6)
+#install.packages("seqinr")
+#if (!require("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install("microbiomeMarker")
+
+#if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+#BiocManager::install(c("phyloseq", "microbiome", "ComplexHeatmap"), update = FALSE)
+#install.packages(
+#  "microViz",
+#  repos = c(davidbarnett = "https://david-barnett.r-universe.dev", getOption("repos"))
+#)
+
+#Load packages
+library(readxl)
+library(tidyverse)
+library(ampvis2)
+library(phyloseq)
+library(seqinr)
+library(BiocManager)
+library(microViz)
+
+#Install ampvis2
+#remotes::install_github("kasperskytte/ampvis2", Ncpus = 6)
+#install phyloseq package:
+#if(!requireNamespace("BiocManager")){
+#  install.packages("BiocManager")
+#}
+#BiocManager::install("phyloseq")
+
+```
+
+```{r}
+load(here::here("phyloseq.RData"))
+```
+
+## Preprocessing
+```{r}
+# #Making metadata file
+# genus <- read_excel("C:/Users/kbt170/Desktop/Christine/metadata.xlsx")
+# genus <- genus %>% rename( id = participant,
+#                          time = samplingTime)
+# 
+# genus$group[genus$id == "D6"|genus$id == "D2"|genus$id == "D38"|genus$id == "D36"|genus$id =="D5"|genus$id =="D52"|genus$id == "D48"|genus$id == "D42"|genus$id =="D39"|genus$id == "D23"|genus$id == "D14"|genus$id =="D29"|genus$id =="D80"|genus$id =="D63"|genus$id =="D41"] <- "low"
+# genus$group[genus$id =="D44"|genus$id =="D25"|genus$id =="D20"|genus$id =="D1"|genus$id =="D67"|genus$id == "D40"|genus$id =="D74"|genus$id =="D78"|genus$id =="D18"|genus$id =="D50"] <- "inter"
+# genus$group[genus$id =="D35"|genus$id =="D31"|genus$id =="D21"|genus$id =="D75"|genus$id =="D65"|genus$id == "D76"|genus$id =="D55"|genus$id =="D51"|genus$id =="D16"|genus$id =="D61"|genus$id =="D4"|genus$id =="D54"|genus$id =="D57"|genus$id =="D77"|genus$id =="D19"] <- "high"
+# 
+# metadata <- genus %>% 
+#   select(!c(sampleID)) %>% 
+#   filter(treatment == "placebo") %>% 
+#   mutate(all=1) %>% 
+#   rename(sampleID= seqID,
+#          Group = group) 
+# metadata$sampleID <- gsub("-", "", metadata$sampleID)
+# 
+# df <- metadata %>% 
+#   filter(str_detect(sampleID,"18"))
+# df$sampleID <-  sub("^.", "", df$sampleID)
+# 
+# metadata <- metadata %>% 
+#   filter(str_detect(sampleID,"MQ")) %>% 
+#   full_join(., df)
+# 
+# metadata$Group[metadata$Group == "low"] <- "1. Slow"
+# metadata$Group[metadata$Group == "inter"] <- "2. Intermediate"
+# metadata$Group[metadata$Group == "high"] <- "3. Rapid"
+# 
+# rm(df, genus)
+# 
+# #write.csv(metadata,file="C:\\Users\\kbt170\\Desktop\\Christine\\metadata.csv"), row.names=TRUE)
+# 
+# #Making file for otutable
+# #open file otutable, choose heading = yes
+# names(otutable) <- gsub("\\.", "", names(otutable))
+# names(otutable) <- gsub("\\X.", "", names(otutable))
+# #write.csv(otutable,file="C:\\Users\\kbt170\\Desktop\\Christine\\otutable.csv"), row.names=TRUE, col.names = TRUE)
+# 
+# #Make taxonomy df
+# 
+# taxo <- read.fasta("C:/Users/kbt170/Desktop/Christine/OTUs.fa", as.string = TRUE, strip.desc = TRUE)
+# 
+# taxo <-lapply(taxo, attributes) 
+# taxo <- as.data.frame(taxo) %>% 
+#     select(-contains("class")) %>% 
+#     select(-contains("name"))
+# 
+# taxo <- taxo %>% 
+#     pivot_longer(cols = everything(),
+#                  names_to = "OTU",
+#                  values_to = "info")
+# 
+# taxo <- taxo %>% separate_wider_delim(info, delim = ";", names =c("ASV", "Kingdom", "Phylum","Class","Order", "Family", "Genus", "Species")) %>% 
+#     mutate(OTU = ASV) %>% 
+#     select(!(ASV))
+```
+
+# Heatmaps using ampvis
+
+```{r} 
+require(ampvis2)
+d <- amp_load(physeq) 
+
+# d <- amp_load(
+#   otutable = otutable,
+#   metadata = metadata) 
+
+#Get message:  Only 79 of 278 unique sample names match between metadata and otutable. The following unmatched samples have been removed
+
+#Subset for time
+sub <- amp_subset_samples(
+  d,
+  time == "T3"
+)
+
+amp_heatmap(
+  sub,
+  group_by = "Group",
+   tax_aggregate = "Species",
+  tax_show = 15)
+```
+
+
+```{r} 
+amp_heatmap(
+  d,
+  group_by = "time",
+   tax_aggregate = "Species",
+  tax_show = 15)
+```
+
+
+```{r} 
+amp_heatmap(
+  d,
+  group_by = "Group","time",
+   tax_aggregate = "Genus",
+  tax_show = 15)
+```
+
+
+```{r} 
+amp_heatmap(
+  d,
+  group_by = "Group","time",
+   tax_aggregate = "Species",
+  tax_show = 15)
+
+```
+
+
+```{r}
+#Subset T1
+sub <- amp_subset_samples(
+  d,
+  time == "T1"
+)
+
+amp_heatmap(
+  d,
+  group_by = "time",
+   tax_aggregate = "Genus",
+  tax_show = 15)
+```
+
+
+```{r}
+amp_heatmap(
+  d,
+  group_by = "Group",
+   tax_aggregate = "Species",
+  tax_show = 15)
+```
+
+#PCA plots
+
+```{r}
+#Subset T1
+sub <- amp_subset_samples(
+  d,
+  time == "T1",
+)
+
+#Subset T2
+sub <- amp_subset_samples(
+  d,
+  time == "T2"
+)
+
+#Subset T3
+sub <- amp_subset_samples(
+  d,
+  time == "T3"
+)
+
+
+#Plot it
+
+amp_ordinate(
+  d, 
+  type = "pca",
+  distmeasure = "bray",
+  sample_color_by = "time",
+)+
+  scale_color_manual(values = c("T1" = "green",
+                                "T2" = "blue", 
+                                "T3" = "orange"
+                                ))+
+  
+  theme_classic()+
+  geom_point(size = 4)+
+  labs(color = "Time")
+
+```
+
+
+#PCA text
+
+```{r}
+#PCA text
+
+#T1
+pca1 <- amp_ordinate(
+  sub, 
+  type = "pca",
+  distmeasure = "bray",
+  sample_color_by = "Group",
+  sample_colorframe = TRUE,
+  sample_colorframe_label = "Group" ,
+  detailed_output = TRUE
+)
+
+pca1$model
+#              Inertia Rank
+#Total          0.6537     
+#Unconstrained  0.6537   38
+#Inertia is variance 
+
+#Eigenvalues for unconstrained axes:
+#    PC1     PC2     PC3     PC4     PC5     PC6     PC7     PC8 
+#0.06204 0.04716 0.03994 0.03266 0.02715 0.02489 0.02372 0.02132 
+
+#T2
+```
+
+
+```{r}
+sub <- amp_subset_samples(
+  d,
+  time == "T2"
+)
+
+pca2 <- amp_ordinate(
+  sub, 
+  type = "pca",
+  distmeasure = "bray",
+  sample_color_by = "Group",
+  sample_colorframe = TRUE,
+  sample_colorframe_label = "Group",
+  detailed_output = TRUE
+)
+
+
+#              Inertia Rank
+#Total          0.6537     
+#Unconstrained  0.6537   38
+#Inertia is variance 
+
+#Eigenvalues for unconstrained axes:
+#    PC1     PC2     PC3     PC4     PC5     PC6     PC7     PC8 
+#0.06204 0.04716 0.03994 0.03266 0.02715 0.02489 0.02372 0.02132
+```
+
+
+```{r}
+sub <- amp_subset_samples(
+  d,
+  time == "T3"
+)
+
+pca3<- amp_ordinate(
+  sub, 
+  type = "pca",
+  distmeasure = "bray",
+  sample_color_by = "Group",
+  sample_colorframe = TRUE,
+  sample_colorframe_label = "Group" ,
+  detailed_output = TRUE
+)
+
+#Eigenvalues for unconstrained axes:
+#    PC1     PC2     PC3     PC4     PC5     PC6     PC7     PC8 
+#0.06124 0.04443 0.03993 0.03372 0.02860 0.02560 0.02408 0.02309
+
+#              Inertia Rank
+#Total          0.6543     
+#Unconstrained  0.6543   39
+```
+#Simpson/Shannon diversity
+
+```{r}
+
+# Subsample/rarefy to 20000 reads and then calculate
+# Shannon and Simpson alpha-diversity indices
+alphadiversityresult <- amp_alphadiv(d, 
+  measure = c("shannon", "simpson"),
+  rarefy = 20000
+)
+
+# Explore the results in the data frame
+View(alphadiversityresult)
+
+```
+
+#Physeq setup
+
+```{r}
+# #Prep metadata table
+# metadata <- metadata %>% column_to_rownames(., var ="sampleID")
+# 
+# #Prep OTU table
+# 
+# otutable <- otutable %>% column_to_rownames(., var ="OTU")
+# 
+# otumat <- data.matrix(otutable)
+# 
+# #Prep taxonomy table
+# 
+# taxo <- taxo %>% column_to_rownames(., var ="OTU")
+# 
+# taxmat <- as.matrix(taxo)
+# 
+# rownames(taxmat) <- rownames(otumat)
+# 
+# 
+# #Build phyloseq object
+# 
+# otu = otu_table(otumat, taxa_are_rows = TRUE)
+# 
+# tax = tax_table(taxmat)
+# 
+# sample = sample_data(metadata)
+# 
+# physeq = phyloseq(otu, tax, sample)
+# 
+# save(physeq, otumat, taxmat, metadata, file="C:\\Users\\kbt170\\Desktop\\phyloseq.RData")
+```
+
+# PERMANOVA 
+
+```{r}
+
+#install.packages("vegan")
+#library(vegan)
+
+library(devtools) # Load the devtools package
+remotes::install_github("umerijaz/microbiomeSeq") # Install the package
+remotes::install_github("cran/KMDA", force = TRUR)
+library(microbiomeSeq)  #load the package
+
+
+#PERMANOVA
+physeq <- normalise_data(physeq, norm.method = "relative") #Do some sort of normalisation or scaling of data - how to choose?
+
+ord.res <- ordination(physeq,distance="bray",method="NMDS",grouping_column="Depth",pvalue.cutoff=0.05) #do ordination, how to set parameters?
+
+p <- plot_ordination(ord.res, method="PCoA" ,pvalue.cutoff=0.05, show.pvalues=T,num.signi.groups=NULL) #plot
+
+```

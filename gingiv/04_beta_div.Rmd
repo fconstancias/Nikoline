@@ -1,0 +1,1262 @@
+---
+title: " Metadata exploration"
+author: "Florentin Constancias"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+# options(java.parameters = "-Xmx80000m")
+```
+
+```{r setup2, include=FALSE}
+##knitr::opts_chunk$set(cache=TRUE)
+##knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(dev = "ragg_png") # https://ragg.r-lib.org/index.html
+##knitr::opts_chunk$set(fig.width = 6) #https://r4ds.had.co.nz/graphics-for-communication.html#figure-sizing
+knitr::opts_chunk$set(fig.asp = 0.618)
+knitr::opts_chunk$set(fig.show = "hold")
+knitr::opts_chunk$set(fig.show = "70%")
+knitr::opts_chunk$set(fig.align = "center")
+options(rgl.useNULL = TRUE)
+```
+
+```{r setup3, include=FALSE}
+library(rgl)
+library(tidyverse)
+library(phyloseq)
+library(readxl)
+require(microbiomeMarker)
+```
+
+
+```{r}
+load(here::here("save.RData"))
+```
+
+
+
+# Beta-diversity:
+
+## compute distances:
+
+```{r}
+source("https://raw.githubusercontent.com/fconstancias/DivComAnalyses/master/R/phyloseq_beta.R") 
+
+physeq_rare %>% 
+  microbiome::transform(., "hellinger") %>% 
+  phyloseq::distance(method = "bray") -> bc
+```
+
+```{r}
+physeq_rare %>% 
+  phyloseq_compute_bdiv(phylo = FALSE) -> dlist
+```
+
+```{r}
+physeq %>% 
+  microViz::dist_calc(., dist = "aitchison") %>% 
+  microViz::dist_get() %>% magrittr::divide_by(100) -> aitch
+```
+
+```{r}
+dlist$bray <- bc
+dlist$aitch <- aitch
+```
+
+```{r}
+plot(dlist$bray, dlist$aitch)
+```
+
+```{r}
+cor.test(dlist$bray, dlist$aitch)
+```
+## Ordination:
+
+```{r}
+physeq_rare %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "Group",
+                                  shape_group = "time",
+                                  alpha = NULL)  + scale_color_manual(name = "", values = treat_pal,
+                                                                      na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") -> pcoas
+
+pcoas
+```
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>% 
+  DT::datatable()
+```
+
+### Selected ordination with trqjectories and envfit taxa:
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = Group ,
+                                    shape = time,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+## Statistical evalutaion:
+
+### Overall:
+
+```{r}
+form = paste0(c("Group", "time"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_rare,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate("Group" = (as.vector(form))) -> perm1
+
+perm1 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+form = paste0(c("Group"), collapse=" * ")
+
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_rare,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate("Group" = (as.vector(form))) -> perm2
+
+perm2 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+form = paste0(c("time"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_rare,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate("Group" = (as.vector(form))) -> perm3
+
+perm3 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+
+form = paste0(c("Group", "time"), collapse=" + ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_rare,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)    %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate("Group" = (as.vector(form))) -> perm4
+
+perm4 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+bind_rows(perm1, perm2,perm3, perm4) -> combined_perm
+
+combined_perm %>% 
+  DT::datatable()
+```
+
+
+```{r}
+bdiv = NULL
+
+bdiv$overall <- list("pcoas" = pcoas,
+                     "pcoas_exp_var" = exp,
+                     "pcoa" = PCOA,
+                     "envfit" = out$signenvfit,
+                     "penvfit" = out$vectors,
+                     "permanovas "= combined_perm )
+```
+
+### Plot Distqnce to bqseline from qll the responders
+
+```{r, fig.show = "40%"}
+physeq_rare %>% 
+  microViz::ps_mutate(tmp2 = paste0(id,"_", time,"_", Group, "_", "wjaccard")) %>% sample_data() %>% 
+  phyloseq_distance_boxplot(p = ., # phyloseq object
+                            dist = dlist$wjaccard, # distance matrix
+                            d = "tmp2") -> outwjaccard # column in metadata for comparaisons
+
+physeq_rare %>% 
+  microViz::ps_mutate(tmp2 = paste0(id,"_", time,"_", Group, "_", "aitch")) %>% sample_data() %>% 
+  phyloseq_distance_boxplot(p = ., # phyloseq object
+                            dist = dlist$aitch, # distance matrix
+                            d = "tmp2") -> outaitch # column in metadata for comparaisons
+
+
+
+outwjaccard$matrix %>% 
+  mutate(distance = "wjaccard") %>% 
+  rbind(., 
+        outaitch$matrix %>% 
+          mutate(distance = "aitch")) %>% 
+  separate(Type1, into = c("id_1", "time_1", "group_1", "dist_1") , sep = "_") %>% 
+  separate(Type2, into = c("id_2", "time_2", "group_2", "dist_2") , sep = "_") -> combined
+
+
+combined %>% 
+  filter(id_1 == id_2,
+         time_1 == "Baseline",
+         time_2 != "Baseline",
+         dist_1 == dist_2) %>% 
+  mutate(group_2 = factor(group_2, levels = c("Slow", "Moderate", "Rapid"))) -> topplot
+
+
+topplot %>% 
+  filter(dist_1 == "wjaccard") %>%
+  ggplot(data = ., aes(x=group_2, y=value)) +
+  geom_boxplot(outlier.colour = NA, alpha=0.7, aes(fill = group_2, color = group_2)) +
+  # ggbeeswarm::geom_beeswarm(size=1, alpha=0.2,
+  #                           position=position_jitterdodge(dodge.width=0.9)) +
+  geom_jitter(size=1, position = position_jitterdodge(dodge.width=1),
+              aes_string(color = "group_2")) + 
+  facet_grid(as.formula(paste0("dist_1 ~ ",paste("time_2"))), scales = "free_y", space = "fixed", switch = "y") +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  theme_light() + ylab("Distance to Baseline") + xlab(NULL) + theme(
+    axis.text.x = element_blank()) -> dist_box
+# scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+
+dist_box
+```
+
+```{r}
+ggpubr::compare_means(formula = as.formula(paste0("value ~ ", paste0("group_2"))),
+                      group.by = c("dist_1", "time_2"),
+                      data = topplot,
+                      method = "wilcox.test",
+                      # paired = TRUE,
+                      p.adjust.method = "fdr") %>%
+  select(-.y., -p.format, -p.signif) %>%
+  arrange(p) %>%
+  mutate(signif = ifelse(p.adj <= 0.05, 'SIGN', 'NS')) -> dist_box_stats
+
+dist_box_stats %>% 
+  DT::datatable()
+```
+
+```{r, fig.show = "40%"}
+topplot %>% 
+  filter(dist_1 == "wjaccard") %>%
+  mutate(group_2 = factor(group_2, levels = c("Slow", "Moderate", "Rapid"))) %>% 
+  ggplot(data = ., aes(x=time_2, y=value)) +
+  geom_boxplot(outlier.colour = NA, alpha=0.7, aes(fill = time_2, color = time_2)) +
+  # ggbeeswarm::geom_beeswarm(size=1, alpha=0.2,
+  #                           position=position_jitterdodge(dodge.width=0.9)) +
+  geom_jitter(size=1, position = position_jitterdodge(dodge.width=1),
+              aes_string(color = "time_2")) + 
+  facet_grid(as.formula(paste0("dist_1 ~ ",paste("group_2"))), scales = "free_y", space = "fixed", switch = "y") +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  theme_light() + ylab("Distance to Baseline") + xlab(NULL) + theme(
+    axis.text.x = element_blank()) -> dist_box2
+# scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+
+dist_box2
+```
+
+
+
+
+```{r}
+ggpubr::compare_means(formula = as.formula(paste0("value ~ ", paste0("time_2"))),
+                      group.by = c("dist_1", "group_1"),
+                      data = topplot,
+                      method = "wilcox.test",
+                      # paired = TRUE,
+                      p.adjust.method = "fdr") %>%
+  select(-.y., -p.format, -p.signif) %>%
+  arrange(p) %>%
+  mutate(signif = ifelse(p.adj <= 0.05, 'SIGN', 'NS')) -> dist_box_stats2
+
+dist_box_stats2 %>% 
+  DT::datatable()
+```
+
+```{r}
+bdiv$distbaseline <- list("dist_box" = dist_box,
+                          "dist_box_stats" = dist_box_stats,
+                          "dist_box2" = dist_box2,
+                          "dist_box_stats2" = dist_box_stats2)
+```
+
+
+### Pairwise:
+
+#### Within time points:
+
+##### T1:
+
+```{r}
+physeq_rare %>% 
+  subset_samples(time == "Baseline") -> physeq_tmp
+```
+
+
+```{r}
+form = paste0(c("Group"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(time = "T1") %>% 
+  mutate(comp = (as.vector(form))) -> perm_t1
+
+perm_t1 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "Group",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Baseline") -> pwperm_t1
+
+pwperm_t1 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "Group",
+                                  shape_group = "time",
+                                  alpha = NULL) + scale_color_manual(name = "", values = treat_pal,
+                                                                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black")  -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() ->exp 
+
+exp %>%
+  DT::datatable()
+
+
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = Group ,
+                                    shape = time,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+```{r}
+bdiv$T1 <-  list("pcoas" = pcoas,
+                 "pcoas_exp_var" = exp,
+                 "pcoa" = PCOA,
+                 "envfit" = out$signenvfit,
+                 "penvfit" = out$vectors,
+                 "PW_permanovas"= pwperm_t1,
+                 "Permanova" = perm_t1)
+```
+
+##### T2:
+
+
+
+```{r}
+physeq_rare %>% 
+  subset_samples(time == "2 weeks treatment") -> physeq_tmp
+```
+
+```{r}
+form = paste0(c("Group"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(time = "T2") %>% 
+  mutate(comp = (as.vector(form))) -> perm_t2
+
+perm_t2 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "Group",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>%
+  mutate(group = "T2") -> pwperm_t2
+
+pwperm_t2 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "Group",
+                                  shape_group = "time",
+                                  alpha = NULL) + scale_color_manual(name = "", values = treat_pal,
+                                                                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black")  -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>%
+  DT::datatable()
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = Group ,
+                                    shape = time,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+
+
+```{r}
+bdiv$T2 <-  list("pcoas" = pcoas,
+                 "pcoas_exp_var" = exp,
+                 "pcoa" = PCOA,
+                 "envfit" = out$signenvfit,
+                 "penvfit" = out$vectors,
+                 "PW_permanovas"= pwperm_t2,
+                 "Permanova" = perm_t2)
+```
+
+##### T3:
+
+```{r}
+physeq_rare %>% 
+  subset_samples(time == "4 weeks") -> physeq_tmp
+```
+
+```{r}
+form = paste0(c("Group"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(time = "T3") %>% 
+  mutate(comp = (as.vector(form))) -> perm_t3
+
+perm_t3 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "Group",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "T3") -> pwperm_t3
+
+pwperm_t3 %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "Group",
+                                  shape_group = "time",
+                                  alpha = NULL) + scale_color_manual(name = "", values = treat_pal,
+                                                                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black")  -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>%
+  DT::datatable()
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = Group ,
+                                    shape = time,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+```{r}
+bdiv$T3 <-  list("pcoas" = pcoas,
+                 "pcoas_exp_var" = exp,
+                 "pcoa" = PCOA,
+                 "envfit" = out$signenvfit,
+                 "penvfit" = out$vectors,
+                 "PW_permanovas" = pwperm_t3,
+                 "Permanova" = perm_t3)
+```
+
+
+#### Within groups:
+
+##### Slow:
+
+
+```{r}
+physeq_rare %>% 
+  subset_samples(Group  == "Slow") -> physeq_tmp
+
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "time",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Slow") -> pwperm_slow
+
+pwperm_slow %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+form = paste0(c("time"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Slow") %>% 
+  mutate(comp = (as.vector(form))) -> perm_slow
+
+perm_slow %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "time",
+                                  shape_group = NULL,
+                                  alpha = NULL) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>%
+  DT::datatable()
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = time ,
+                                    shape = NULL,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+
+```{r}
+bdiv$slow <-  list("pcoas" = pcoas,
+                   "pcoas_exp_var" = exp,
+                   "pcoa" = PCOA,
+                   "envfit" = out$signenvfit,
+                   "penvfit" = out$vectors,
+                   "PWpermanovas"= pwperm_slow,
+                   "PERMANOVA" = perm_slow)
+```
+
+
+##### Intermediate:
+
+```{r}
+physeq_rare %>% 
+  subset_samples(Group == "Moderate") -> physeq_tmp
+
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "time",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Intermediate") -> pwperm_int
+
+pwperm_int %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+form = paste0(c("time"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Intermediate") %>% 
+  mutate(comp = (as.vector(form))) -> perm_int
+
+perm_int %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "time",
+                                  shape_group = NULL,
+                                  alpha = NULL) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>%
+  DT::datatable()
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = time ,
+                                    shape = NULL,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+
+```{r}
+bdiv$int <-  list("pcoas" = pcoas,
+                  "pcoas_exp_var" = exp,
+                  "pcoa" = PCOA,
+                  "envfit" = out$signenvfit,
+                  "penvfit" = out$vectors,
+                  "PWpermanovas"= pwperm_int,
+                  "PERMANOVA" = perm_int)
+```
+
+
+##### Fast:
+
+```{r}
+physeq_rare %>% 
+  subset_samples(Group == "Rapid") -> physeq_tmp
+
+
+lapply(
+  dlist,
+  FUN = physeq_pairwise_permanovas_adonis2,
+  physeq = physeq_tmp,
+  compare_header = "time",
+  n_perm = 999,
+  strat = FALSE
+) %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Fast") -> pwperm_fst
+
+pwperm_fst %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  # filter(! terms %in% (c("Residuals", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+form = paste0(c("time"), collapse=" * ")
+
+lapply(
+  dlist,
+  FUN = phyloseq_adonis2,
+  physeq = physeq_tmp,
+  formula = form,
+  nrep = 999,
+  # strata = "id"
+)  %>%
+  bind_rows(.id = "Distance") %>% 
+  mutate(group = "Fast") %>% 
+  mutate(comp = (as.vector(form))) -> perm_fst
+
+perm_fst %>% 
+  mutate_if(is.numeric, round, 3) %>%
+  filter(! terms %in% (c("Residual", "Total"))) %>%
+  DT::datatable()
+```
+
+
+```{r}
+physeq_tmp %>% 
+  phyloseq_plot_bdiv(dlist = dlist, # list of distance computed from a phyloseq object
+                     ps_rare = ., # phyloseq object
+                     m = "PCoA", # PCoA or NMDS
+                     seed = 123, # for reproducibility
+                     axis1 = 1, # axis to plot
+                     axis2 = 2) -> plot_list
+```
+
+```{r}
+plot_list %>%
+  phyloseq_plot_ordinations_facet(color_group = "time",
+                                  shape_group = NULL,
+                                  alpha = NULL) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") -> pcoas
+
+pcoas
+```
+
+```{r}
+plot_list %>%
+  phyloseq_ordinations_expl_var() -> exp
+
+exp %>%
+  DT::datatable()
+```
+
+```{r}
+plot_list$wjaccard$layers[[1]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+plot_list$wjaccard$layers[[2]] = NULL; plot_list$wjaccard$layers[[1]] = NULL
+
+# plots_hall_humans$aichinson$layers[[1]] = NULL;plots_hall_humans$aichinson$layers[[1]] = NULL
+# plots_hall_humans$aichinson$layers[[2]] = NULL;plots_hall_humans$aichinson$layers[[2]] = NULL
+
+plot_list$wjaccard + geom_point(size = 3,
+                                aes(colour = time ,
+                                    shape = NULL,
+                                    alpha = NULL)) +
+  geom_path(data = plot_list$wjaccard$data %>%
+              arrange(Group) ,
+            # aes(colour = Treatment, group = interaction(Model, Model2, Antibiotic, Treatment, Fermentation, Reactor,Antibiotic_mg.L)),
+            aes(colour = Group, group = id),
+            
+            arrow = arrow(
+              angle = 30, length = unit(0.15, "inches"),
+              ends = "last", type = "open"
+            ), linetype = "longdash", size = 0.1) +
+  theme_light() +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  # scale_shape_manual(name = "" ,values = c(15,16,18,19), na.value =  17) +
+  theme(legend.position = "right")  -> PCOA
+
+PCOA
+```
+
+```{r}
+PCOA + 
+  scale_fill_manual(values = c("transparent")) + 
+  scale_color_manual(values = c(rep("transparent", 3))) + 
+  theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) -> empty_plot_tmp
+
+physeq_rare %>%
+  phyloseq_add_taxa_vector_fix(phyloseq = .,
+                               dist = dlist$wjaccard,
+                               taxrank_glom = "Family",
+                               figure_ord = empty_plot_tmp, 
+                               fact = 0.2, pval_cutoff = 0.05,
+                               top_r = 8) -> out #top 10 correlated genera
+
+out$signenvfit %>% 
+  DT::datatable()
+```
+
+```{r}
+out$vectors
+```
+
+```{r}
+bdiv$rapid <-  list("pcoas" = pcoas,
+                    "pcoas_exp_var" = exp,
+                    "pcoa" = PCOA,
+                    "envfit" = out$signenvfit,
+                    "penvfit" = out$vectors,
+                    "PWpermanovas"= pwperm_fst,
+                    "PERMANOVA" = perm_fst)
+```
+
+
+
+```{r}
+save(physeq, treat_pal, time_pal,meta, physeq_rare ,alpha_save, plot_rare, heat_all, bdiv, file = here::here("save.RData"))
+
+```
+
+```{r}
+sessionInfo()
+```
+

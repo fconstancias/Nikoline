@@ -1,0 +1,186 @@
+---
+title: " Metadata exploration"
+author: "Florentin Constancias"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+# options(java.parameters = "-Xmx80000m")
+```
+
+```{r setup2, include=FALSE}
+# knitr::opts_chunk$set(cache=TRUE)
+# knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(dev = "ragg_png") # https://ragg.r-lib.org/index.html
+##knitr::opts_chunk$set(fig.width = 6) #https://r4ds.had.co.nz/graphics-for-communication.html#figure-sizing
+knitr::opts_chunk$set(fig.asp = 0.618)
+knitr::opts_chunk$set(fig.show = "hold")
+knitr::opts_chunk$set(fig.show = "70%")
+knitr::opts_chunk$set(fig.align = "center")
+options(rgl.useNULL = TRUE)
+```
+
+```{r setup3, include=FALSE}
+library(rgl)
+library(tidyverse)
+library(phyloseq)
+```
+
+
+```{r}
+load(here::here("save.RData"))
+```
+
+
+```{r}
+physeq %>%
+  sample_data() %>% 
+  data.frame() %>% 
+  select(- time) %>%
+  pivot_longer(P1:B3, names_to = "name") %>% 
+  # mutate(study = recode(study, study1 = "sugar rinsing", study2 = "oral hygene interuption")) %>%
+  mutate(clinical_var = case_when(startsWith(name, "B") ~ "BOP %",
+                                  startsWith(name, "P") ~ "Quigley Hein plaque index")) %>% 
+  rename(period = "name") %>%
+  mutate(period = str_replace_all(period, pattern = c("B|P"),replacement =  "p"))  %>%
+  mutate(period = recode(period, p1 = "Baseline", p2 = "2 weeks treatment", p3 = "4 weeks" )) %>%
+  mutate(period = factor(period, levels = c ("Baseline", "2 weeks treatment", "4 weeks"))) %>% 
+  distinct(.keep_all = T) -> data
+
+data %>% 
+  DT::datatable()
+```
+```{r}
+data %>% 
+  group_by(period, clinical_var, Group) %>% 
+  rstatix::get_summary_stats(value, type = "full") %>% 
+  DT::datatable()
+```
+
+```{r}
+data %>%  
+  ggplot(aes_string("period",
+                    "value",
+                    colour = "period",
+                    fill = "period")) +
+  geom_boxplot(outlier.colour = NA, alpha=0.7) +
+  # ggbeeswarm::geom_beeswarm(size=1, alpha=0.2,
+  #                           position=position_jitterdodge(dodge.width=0.9)) +
+  geom_jitter(size=1, position = position_jitterdodge(dodge.width=1),
+              aes_string(shape = NULL))  + facet_grid(clinical_var ~ Group, switch = "y",  scales = "free_y", space = "fixed") + theme(strip.placement = "outside") +   theme(axis.title.x=element_blank(),
+                                                                                                                                                                              axis.text.x=element_blank(),
+                                                                                                                                                                              axis.ticks.x=element_blank()) +  scale_color_manual(name = "", values = time_pal,
+                                                                                                                                                                                                                                  na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  geom_line(aes(group=id), linetype = "dashed", color = "black", linewidth = 0.08) + theme_light() + ylab(NULL) + xlab(NULL)+ theme(
+    axis.text.x = element_blank()) -> pmeta1
+
+pmeta1
+```
+
+
+```{r, include=FALSE}
+pmeta1 %>% 
+  export::graph2ppt(append = TRUE,
+                    width = 317.48031496 ,
+                    height = 0.618 * 317.48031496  , paper = "A4",  scaling = 2,
+                    file = "meta_plots.pptx")
+```
+
+
+```{r}
+pmeta1$data %>% 
+  group_by(clinical_var) %>% 
+  rstatix::pairwise_wilcox_test(formula = value ~ period, p.adjust.method = "BH", paired = TRUE, detailed = TRUE, ref.group = "Baseline") %>% 
+  select(-'.y.') %>% 
+  arrange(p) -> df_tmp
+```
+
+
+```{r}
+df_tmp %>% 
+  DT::datatable()
+```
+
+
+```{r}
+ggpubr::compare_means(formula = as.formula(paste0("value ~ ", paste0("period"))),
+                      group.by = c("clinical_var", "Group"),
+                      data = pmeta1$data ,
+                      method = "wilcox.test",
+                      p.adjust.method = "fdr") %>%
+  select(-.y., -p.format, -p.signif) %>%
+  arrange(p) %>%
+  mutate(signif = ifelse(p.adj <= 0.05, 'SIGN', 'NS')) -> stat1
+
+stat1 %>% 
+  DT::datatable()
+```
+
+```{r}
+data %>%  
+  ggplot(aes_string("Group",
+                    "value",
+                    colour = "Group",
+                    fill = "Group")) +
+  geom_boxplot(outlier.colour = NA, alpha=0.7) +
+  # ggbeeswarm::geom_beeswarm(size=1, alpha=0.2,
+  #                           position=position_jitterdodge(dodge.width=0.9)) +
+  geom_jitter(size=1, position = position_jitterdodge(dodge.width=1),
+              aes_string(shape = NULL))  + facet_grid(clinical_var ~ period, switch = "y",  scales = "free_y", space = "fixed") + theme(strip.placement = "outside") +   theme(axis.title.x=element_blank(),
+                                                                                                                                                                               axis.text.x=element_blank(),
+                                                                                                                                                                               axis.ticks.x=element_blank()) +  scale_color_manual(name = "", values = treat_pal,
+                                                                                                                                                                                                                                   na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") +
+  geom_line(aes(group=id), linetype = "dashed", color = "black", linewidth = 0.08) + theme_light() + ylab(NULL) + xlab(NULL) + theme(
+    axis.text.x = element_blank()) -> pmeta2
+
+pmeta2
+```
+
+```{r, include=FALSE}
+pmeta2 %>% 
+  export::graph2ppt(append = TRUE,
+                    width = 317.48031496 ,
+                    height = 0.618 * 317.48031496  , paper = "A4",  scaling = 2,
+                    file = "meta_plots.pptx")
+```
+
+```{r}
+ggpubr::compare_means(formula = as.formula(paste0("value ~ ", paste0("Group"))),
+                      group.by = c("clinical_var", "period"),
+                      data = pmeta2$data ,
+                      method = "wilcox.test",
+                      p.adjust.method = "fdr") %>%
+  select(-.y., -p.format, -p.signif) %>%
+  arrange(p) %>%
+  mutate(signif = ifelse(p.adj <= 0.05, 'SIGN', 'NS')) -> stat2
+
+stat2 %>% 
+  DT::datatable()
+```
+```{r}
+meta <- list(
+  "plot_meta1" = pmeta1,
+  "stat_meta1"= stat1,
+  "plot_meta2" = pmeta2,
+  "stat_meta2"= stat2)
+```
+
+```{r}
+save(physeq, treat_pal, time_pal, physeq_rare, plot_rare, meta,file = here::here("save.RData"))
+
+```
+
+```{r}
+sessionInfo()
+```
+

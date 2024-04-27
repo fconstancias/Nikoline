@@ -1,0 +1,104 @@
+Le chargement a nécessité le package : optparse
+
+##running run_atropos() '
+
+' input dir = 01_RawDataLe chargement a nécessité le package : tidyverse
+Le chargement a nécessité le package : dada2
+Le chargement a nécessité le package : Rcpp
+Le chargement a nécessité le package : ShortRead
+Le chargement a nécessité le package : BiocGenerics
+
+Attachement du package : ‘BiocGenerics’
+
+Les objets suivants sont masqués depuis ‘package:stats’:
+
+    IQR, mad, sd, var, xtabs
+
+Les objets suivants sont masqués depuis ‘package:base’:
+
+    anyDuplicated, aperm, append, as.data.frame, basename, cbind,
+    colnames, dirname, do.call, duplicated, eval, evalq, Filter, Find,
+    get, grep, grepl, intersect, is.unsorted, lapply, Map, mapply,
+    match, mget, order, paste, pmax, pmax.int, pmin, pmin.int,
+    Position, rank, rbind, Reduce, rownames, sapply, setdiff, sort,
+    table, tapply, union, unique, unsplit, which.max, which.min
+
+Le chargement a nécessité le package : BiocParallel
+Le chargement a nécessité le package : Biostrings
+Le chargement a nécessité le package : S4Vectors
+Le chargement a nécessité le package : stats4
+
+Attachement du package : ‘S4Vectors’
+
+L'objet suivant est masqué depuis ‘package:utils’:
+
+    findMatches
+
+Les objets suivants sont masqués depuis ‘package:base’:
+
+    expand.grid, I, unname
+
+Le chargement a nécessité le package : IRanges
+Le chargement a nécessité le package : XVector
+Le chargement a nécessité le package : GenomeInfoDb
+
+Attachement du package : ‘Biostrings’
+
+L'objet suivant est masqué depuis ‘package:base’:
+
+    strsplit
+
+Le chargement a nécessité le package : Rsamtools
+Le chargement a nécessité le package : GenomicRanges
+Le chargement a nécessité le package : GenomicAlignments
+Le chargement a nécessité le package : SummarizedExperiment
+Le chargement a nécessité le package : MatrixGenerics
+Le chargement a nécessité le package : matrixStats
+
+Attachement du package : ‘MatrixGenerics’
+
+Les objets suivants sont masqués depuis ‘package:matrixStats’:
+
+    colAlls, colAnyNAs, colAnys, colAvgsPerRowSet, colCollapse,
+    colCounts, colCummaxs, colCummins, colCumprods, colCumsums,
+    colDiffs, colIQRDiffs, colIQRs, colLogSumExps, colMadDiffs,
+    colMads, colMaxs, colMeans2, colMedians, colMins, colOrderStats,
+    colProds, colQuantiles, colRanges, colRanks, colSdDiffs, colSds,
+    colSums2, colTabulates, colVarDiffs, colVars, colWeightedMads,
+    colWeightedMeans, colWeightedMedians, colWeightedSds,
+    colWeightedVars, rowAlls, rowAnyNAs, rowAnys, rowAvgsPerColSet,
+    rowCollapse, rowCounts, rowCummaxs, rowCummins, rowCumprods,
+    rowCumsums, rowDiffs, rowIQRDiffs, rowIQRs, rowLogSumExps,
+    rowMadDiffs, rowMads, rowMaxs, rowMeans2, rowMedians, rowMins,
+    rowOrderStats, rowProds, rowQuantiles, rowRanges, rowRanks,
+    rowSdDiffs, rowSds, rowSums2, rowTabulates, rowVarDiffs, rowVars,
+    rowWeightedMads, rowWeightedMeans, rowWeightedMedians,
+    rowWeightedSds, rowWeightedVars
+
+Le chargement a nécessité le package : Biobase
+Welcome to Bioconductor
+
+    Vignettes contain introductory material; view with
+    'browseVignettes()'. To cite Bioconductor, see
+    'citation("Biobase")', and for packages 'citation("pkgname")'.
+
+
+Attachement du package : ‘Biobase’
+
+L'objet suivant est masqué depuis ‘package:MatrixGenerics’:
+
+    rowMedians
+
+Les objets suivants sont masqués depuis ‘package:matrixStats’:
+
+    anyMissing, rowMedians
+
+
+##You are using DADA2 version 1.31.0
+Erreur dans packageVersion("tidyverse") : 
+  aucun package nommé ‘tidyverse’ n'est trouvé
+Appels : run_dada2_pipe -> run_atropos -> cat -> paste0 -> packageVersion
+De plus : Message d'avis :
+Dans library(package, lib.loc = lib.loc, character.only = TRUE, logical.return = TRUE,  :
+  aucun package nommé ‘tidyverse’ n'est trouvé
+Exécution arrêtée

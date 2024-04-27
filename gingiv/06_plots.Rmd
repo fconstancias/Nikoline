@@ -1,0 +1,114 @@
+---
+title: " ViZ "
+author: "Florentin Constancias"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+# options(java.parameters = "-Xmx80000m")
+```
+
+```{r setup2, include=FALSE}
+##knitr::opts_chunk$set(cache=TRUE)
+##knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(dev = "ragg_png") # https://ragg.r-lib.org/index.html
+##knitr::opts_chunk$set(fig.width = 6) #https://r4ds.had.co.nz/graphics-for-communication.html#figure-sizing
+knitr::opts_chunk$set(fig.asp = 0.618)
+knitr::opts_chunk$set(fig.show = "hold")
+knitr::opts_chunk$set(fig.show = "70%")
+knitr::opts_chunk$set(fig.align = "center")
+```
+
+```{r setup3, include=FALSE}
+library(tidyverse)
+```
+
+
+```{r}
+load(here::here("save.RData"))
+```
+
+
+```{r}
+bdiv$overall$pcoa
+```
+
+```{r}
+bdiv$overall$pcoas
+```
+
+```{r}
+bdiv$overall$pcoa
+```
+
+```{r}
+bdiv$distbaseline$dist_box
+```
+
+```{r}
+bdiv$T1$pcoa
+```
+
+```{r}
+bdiv$T1$Permanova %>% 
+  DT::datatable()
+```
+
+Rely on the pvalFDR p values below:
+
+```{r}
+bdiv$T1$PW_permanovas %>% 
+  DT::datatable()
+```
+
+```{r}
+heat_all$p_heat_sp_t1 
+```
+```{r}
+bdiv$T1$pcoa
+```
+
+```{r}
+bdiv$T1$penvfit
+```
+
+```{r}
+bdiv$slow$PERMANOVA %>% 
+  DT::datatable()
+```
+
+
+```{r}
+bdiv$int$PERMANOVA %>% 
+  DT::datatable()
+```
+
+```{r}
+bdiv$rapid$PERMANOVA %>% 
+  DT::datatable()
+```
+
+```{r}
+bdiv$T1$PW_permanovas %>% 
+  DT::datatable()
+```
+
+```{r}
+bdiv$T1$pcoa
+```
+
+```{r}
+bdiv$T1$penvfit
+```
+
+
+```{r}
+sessionInfo()
+```
+

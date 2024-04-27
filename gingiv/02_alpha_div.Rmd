@@ -1,0 +1,154 @@
+---
+title: " Metadata exploration"
+author: "Florentin Constancias"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+# options(java.parameters = "-Xmx80000m")
+```
+
+```{r setup2, include=FALSE}
+# knitr::opts_chunk$set(cache=TRUE)
+# knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(dev = "ragg_png") # https://ragg.r-lib.org/index.html
+##knitr::opts_chunk$set(fig.width = 6) #https://r4ds.had.co.nz/graphics-for-communication.html#figure-sizing
+knitr::opts_chunk$set(fig.asp = 0.618)
+knitr::opts_chunk$set(fig.show = "hold")
+knitr::opts_chunk$set(fig.show = "70%")
+knitr::opts_chunk$set(fig.align = "center")
+options(rgl.useNULL = TRUE)
+```
+
+```{r setup3, include=FALSE}
+library(rgl)
+library(tidyverse)
+library(phyloseq)
+```
+
+
+```{r}
+load(here::here("save.RData"))
+```
+
+
+# Alpha-diversity:
+
+## compute metrics:
+
+```{r}
+source("https://raw.githubusercontent.com/fconstancias/DivComAnalyses/master/R/phyloseq_alpha.R")
+
+physeq_rare %>% 
+  phyloseq_alphas() -> alphas
+```
+
+
+```{r}
+alphas %>%
+  plot_alphas(measure = c("observed", "diversity_shannon", "evenness_pielou"),
+              x_group = "Group",
+              colour_group = "Group",
+              fill_group = "Group",
+              shape_group = "sex",
+              facet_group = "time",
+              test_group = "Group",
+              test_group_2 = "time") -> alpha_1
+
+alpha_1$plot + 
+  facet_grid(alphadiversiy~ time, switch = "y",  scales = "free_y", space = "fixed") + 
+  theme(strip.placement = "outside") +
+  theme(axis.title.x=element_blank(),axis.text.x=element_blank(), axis.ticks.x=element_blank()) + 
+  scale_color_manual(name = "", values = treat_pal,na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black") -> alpha_1$plot
+
+
+alpha_1$plot
+```
+
+
+```{r}
+alpha_1$stat %>% 
+  DT::datatable()
+```
+
+
+```{r}
+alpha_1$plot$data %>% 
+  select(sample_id_tmp,alphadiversiy,time, id, Group,  value) %>% 
+  pivot_wider(names_from = alphadiversiy, values_from = value) %>% 
+  DT::datatable()
+```
+
+
+```{r, include=FALSE}
+alpha_1$plot %>% 
+  export::graph2ppt(append = TRUE,
+                    width = 317.48031496 ,
+                    height = 0.618 * 317.48031496  , paper = "A4",  scaling = 2,
+                    file = "alpha_plots.pptx")
+```
+
+```{r}
+alphas %>%
+  plot_alphas(measure = c("observed", "diversity_shannon", "evenness_pielou"),
+              x_group = "time",
+              colour_group = "time",
+              fill_group = "time",
+              shape_group = NULL,
+              facet_group = "Group",
+              test_group = "time",
+              test_group_2 = "Group") -> alpha_2
+
+alpha_2$plot + facet_grid(alphadiversiy~ Group, switch = "y",  scales = "free_y", space = "fixed") + theme(strip.placement = "outside") +   theme(axis.title.x=element_blank(),
+                                                                                                                                                  axis.text.x=element_blank(),
+                                                                                                                                                  axis.ticks.x=element_blank()) +  scale_color_manual(name = "", values = time_pal,
+                                                                                                                                                                                                      na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black") +
+  geom_line(aes(group=id), linetype = "dashed", color = "black", linewidth = 0.08) -> alpha_2$plot
+
+
+alpha_2$plot
+```
+
+
+```{r}
+alpha_2$plot$data %>% 
+  select(sample_id_tmp,alphadiversiy,time, id, Group,  value) %>% 
+  pivot_wider(names_from = alphadiversiy, values_from = value) %>% 
+  DT::datatable()
+```
+
+```{r}
+alpha_2$stat %>% 
+  DT::datatable()
+```
+
+```{r, include=FALSE}
+alpha_2$plot %>% 
+  export::graph2ppt(append = TRUE,
+                    width = 317.48031496 ,
+                    height = 0.618 * 317.48031496  , paper = "A4",  scaling = 2,
+                    file = "alpha_plots.pptx")
+```
+
+```{r}
+alpha_save <- list("alpha_1" =alpha_1, "alpha_2" = alpha_2)
+```
+
+```{r}
+save(physeq, treat_pal, time_pal, physeq_rare ,alpha_save, plot_rare, meta, file = here::here("save.RData"))
+```
+
+```{r}
+sessionInfo()
+```
+

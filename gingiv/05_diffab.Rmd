@@ -1,0 +1,439 @@
+---
+title: " Metadata exploration"
+author: "Florentin Constancias"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document: 
+    toc: yes
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+gc()
+# options(java.parameters = "-Xmx80000m")
+```
+
+```{r setup2, include=FALSE}
+##knitr::opts_chunk$set(cache=TRUE)
+##knitr::opts_chunk$set(echo = TRUE)
+# knitr::opts_chunk$set(dev = "ragg_png") # https://ragg.r-lib.org/index.html
+##knitr::opts_chunk$set(fig.width = 6) #https://r4ds.had.co.nz/graphics-for-communication.html#figure-sizing
+knitr::opts_chunk$set(fig.asp = 0.618)
+knitr::opts_chunk$set(fig.show = "hold")
+knitr::opts_chunk$set(fig.show = "70%")
+knitr::opts_chunk$set(fig.align = "center")
+```
+
+```{r setup3, include=FALSE}
+library(tidyverse)
+library(phyloseq)
+
+library(readxl)
+require(microbiomeMarker)
+source("https://raw.githubusercontent.com/fconstancias/DivComAnalyses/master/R/phyloseq_varia.R")
+source("https://raw.githubusercontent.com/fconstancias/DivComAnalyses/master/R/phyloseq_heatmap.R")
+source("https://raw.githubusercontent.com/fconstancias/DivComAnalyses/master/R/phyloseq_alpha.R")
+```
+
+```{r}
+load(here::here("save.RData"))
+```
+
+
+
+### Pairwise:
+
+#### Within time points:
+
+##### T1:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(time == "Baseline") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+```{r}
+lefse = NULL
+
+lefse$T1$genus$plot <- lef_plot
+lefse$T1$genus$table <- lefse_df
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = treat_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = treat_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+lefse$T1$species$plot <- lef_plot
+lefse$T1$species$table <- lefse_df
+```
+
+##### T2:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(time == "2 weeks treatment") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+# lef_out %>% 
+#   marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+# plot_ef_bar(lef_out) +
+#   scale_color_manual(name = "", values = treat_pal,
+#                      na.value = "black") +
+#   scale_fill_manual(name = "", values = treat_pal,
+#                     na.value = "black")  -> lef_plot
+# 
+# lef_plot
+```
+
+```{r}
+
+lefse$T2$genus$plot <- NULL
+lefse$T2$genus$table <- NULL
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+# lef_out %>% 
+#   marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+# plot_ef_bar(lef_out) +
+#   scale_color_manual(name = "", values = treat_pal,
+#                      na.value = "black") +
+#   scale_fill_manual(name = "", values = treat_pal,
+#                     na.value = "black")  -> lef_plot
+# 
+# lef_plot
+```
+
+```{r}
+
+lefse$T2$species$plot <- NULL
+lefse$T2$species$table <- NULL
+```
+
+##### T3:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(time == "4 weeks") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+# lef_out %>% 
+#   marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+# plot_ef_bar(lef_out) +
+#   scale_color_manual(name = "", values = treat_pal,
+#                      na.value = "black") +
+#   scale_fill_manual(name = "", values = treat_pal,
+#                     na.value = "black")  -> lef_plot
+# 
+# lef_plot
+```
+
+```{r}
+
+lefse$T3$genus$plot <- NULL
+lefse$T3$genus$table <- NULL
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "Group", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = TRUE, strict = "1") -> lef_out
+```
+
+```{r}
+# lef_out %>% 
+#   marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+# plot_ef_bar(lef_out) +
+#   scale_color_manual(name = "", values = treat_pal,
+#                      na.value = "black") +
+#   scale_fill_manual(name = "", values = treat_pal,
+#                     na.value = "black")  -> lef_plot
+# 
+# lef_plot
+```
+
+```{r}
+
+lefse$T3$species$plot <- NULL
+lefse$T3$species$table <- NULL
+```
+
+#### Within groups:
+
+##### Slow:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(Group == "Slow") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+
+lefse$slow$genus$plot <- lef_plot
+lefse$slow$genus$table <- lefse_df
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+
+lefse$slow$species$plot <- lef_plot
+lefse$slow$species$table <- lefse_df
+```
+
+### Moderate:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(Group == "Moderate") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+
+lefse$Moderate$genus$plot <- lef_plot
+lefse$Moderate$genus$table <- lefse_df
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+lefse$Moderate$species$plot <- lef_plot
+lefse$Moderate$species$table <- lefse_df
+```
+
+
+### Rapid:
+
+```{r}
+physeq_rare %>% 
+      physeq_sel_tax_table(c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")) %>% 
+  subset_samples(Group == "Rapid") -> physeq_tmp
+```
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Genus", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+
+lefse$Rapid$genus$plot <- lef_plot
+lefse$Rapid$genus$table <- lefse_df
+```
+
+
+```{r}
+physeq_tmp %>% 
+  run_lefse(.,taxa_rank = "Species", group = "time", norm = "CPM",
+            kw_cutoff = 0.05, lda_cutoff = 2, multigrp_strat = FALSE, strict = "2") -> lef_out
+```
+
+```{r}
+lef_out %>% 
+  marker_table() %>%  data.frame() -> lefse_df
+```
+
+```{r}
+plot_ef_bar(lef_out) +
+  scale_color_manual(name = "", values = time_pal,
+                     na.value = "black") +
+  scale_fill_manual(name = "", values = time_pal,
+                    na.value = "black")  -> lef_plot
+
+lef_plot
+```
+
+```{r}
+
+lefse$Rapid$species$plot <- lef_plot
+lefse$Rapid$species$table <- lefse_df
+```
+
+```{r}
+lefse$T1$species$plot
+```
+
+```{r}
+save(physeq, treat_pal, time_pal,meta, physeq_rare ,alpha_save, plot_rare, heat_all, bdiv, lefse, file = here::here("save.RData"))
+```
+
+```{r}
+sessionInfo()
+```
+
